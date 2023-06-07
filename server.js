@@ -3,6 +3,12 @@ const path = require("path");
 const http = require("http");
 const socketio = require("socket.io");
 const formatMessage = require("./utils/messages");
+const {
+  userJoin,
+  getCurrentUser,
+  userLeave,
+  getRoomUsers,
+} = require("./utils/users");
 require("dotenv").config();
 
 const app = express();
@@ -17,27 +23,48 @@ const botName = "ChatMeBot";
 // Run when client connects
 io.on("connection", (socket) => {
   socket.on("joinRoom", ({ username, room }) => {
-    io.emit("roomInfo", { username, room });
-  });
+    const user = userJoin(socket.id, username, room);
 
-  // Welcome message
-  socket.emit("message", formatMessage(botName, "Welcome to LetsChat!"));
+    socket.join(user.room);
 
-  // Broadcast when a user connects
-  socket.broadcast.emit(
-    "message",
-    formatMessage(botName, "A user has joined the chat")
-  );
+    // Welcome message
+    socket.emit("message", formatMessage(botName, "Welcome to LetsChat!"));
 
-  // Runs when client disconnects
-  socket.on("disconnect", () => {
-    io.emit("message", formatMessage(botName, "A user has left the chat"));
+    // Broadcast when a user connects
+    socket.broadcast
+      .to(user.room)
+      .emit(
+        "message",
+        formatMessage(botName, `${user.username}  has joined the chat`)
+      );
+
+    // Send users in room info
+    io.to(user.room).emit("roomUsers", {
+      room: user.room,
+      users: getRoomUsers(user.room),
+    });
   });
 
   // Listen for chatMessage
   socket.on("chatMessage", (msg) => {
+    const user = getCurrentUser(socket.id);
     // Send the message to frontend
-    io.emit("message", formatMessage("User", msg));
+    io.to(user.room).emit("message", formatMessage(user.username, msg));
+  });
+
+  // Runs when client disconnects
+  socket.on("disconnect", () => {
+    const user = userLeave(socket.id);
+    if (user) {
+      io.to(user.room).emit(
+        "message",
+        formatMessage(botName, `${user.username} has left the chat`)
+      );
+      io.to(user.room).emit("roomUsers", {
+        room: user.room,
+        users: getRoomUsers(user.room),
+      });
+    }
   });
 });
 

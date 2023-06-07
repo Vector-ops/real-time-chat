@@ -6,15 +6,14 @@ const { username, room } = Qs.parse(location.search, {
   ignoreQueryPrefix: true,
 });
 
-console.log({ username, room });
-
 const socket = io();
 //Join chat room
 socket.emit("joinRoom", { username, room });
 
-// Set room name and users
-socket.on("roomInfo", ({ username, room }) => {
-  setRoomInfo({ username, room });
+// Get room name and users
+socket.on("roomUsers", ({ room, users }) => {
+  setRoomInfo(room);
+  updateUsers(users);
 });
 
 // Message from server
@@ -29,17 +28,16 @@ chatForm.addEventListener("submit", (e) => {
 
   // Emit message to server
   socket.emit("chatMessage", msg);
-  // Scroll down
-  chatMessages.scrollTop = chatMessages.scrollHeight;
 
   // Clear input
   e.target.elements.msg.value = "";
   e.target.elements.msg.focus();
+  // Scroll down
+  chatMessages.scrollTop = chatMessages.scrollHeight;
 });
 
 // Output message to DOM
 const outputMessage = (message) => {
-  console.log(message);
   const div = document.createElement("div");
   div.classList.add("message");
   div.innerHTML = `
@@ -48,11 +46,19 @@ const outputMessage = (message) => {
   document.querySelector(".chat-messages").appendChild(div);
 };
 
-const setRoomInfo = ({ username, room }) => {
+// Add room name
+const setRoomInfo = (room) => {
   const roomName = document.getElementById("room-name");
-  const Users = document.getElementById("users");
-  const user = document.createElement("li");
-  user.innerText = username;
   roomName.innerText = room;
-  Users.appendChild(user);
+};
+
+// Update user list
+const updateUsers = (users) => {
+  const userList = document.getElementById("users");
+  userList.innerHTML = "";
+  users.forEach((user) => {
+    const li = document.createElement("li");
+    li.innerText = user.username;
+    userList.appendChild(li);
+  });
 };
